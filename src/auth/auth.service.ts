@@ -1,12 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuthDto } from './dto';
+import * as argon from 'argon2';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
 
-@Injectable({})
+@Injectable()
 export class AuthService {
-  signin() {
-    return 'I am signin';
+  constructor(private prismaService: PrismaService) {}
+
+  async signup(dto: AuthDto) {
+    const hash = await argon.hash(dto.password);
+
+    try {
+      const user = await this.prismaService.user.create({
+        data: {
+          email: dto.email,
+          hash,
+        },
+      });
+
+      // Make better
+      delete user.hash;
+
+      return user;
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ForbiddenException('Credentials taken');
+        }
+      }
+    }
   }
 
-  signup() {
-    return 'I am signup';
+  signin() {
+    return 'I am signin';
   }
 }
